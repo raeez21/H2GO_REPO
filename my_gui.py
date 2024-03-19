@@ -7,6 +7,13 @@ from tkinter import ttk
 from tkinter import scrolledtext #For scroll bar
 from tabulate import tabulate #To display the records as a table in Tkinter display
 
+def custom_fill(group):
+        print(f'group {group} type {type(group)}')
+        # levelTo = group.iloc[-1]["levelTo"]
+        group = group.iloc[0]
+        # group['levelTo'] = levelTo
+        return group
+
 
 class BMRSAnalyzer(tk.Tk):
     """A GUI application for analyzing data from the BMRS API.
@@ -67,6 +74,87 @@ class BMRSAnalyzer(tk.Tk):
         BMU_ids = pd.read_csv("./reg_bm_units.csv", usecols=["BM Unit ID"],skiprows=2).squeeze().tolist()
         return BMU_ids
 
+    
+
+    def DataResample(self, df, target_frequency, start_date, end_date):
+        # print(f'freq {frequency} type {type(frequency)}')
+        # df.set_index('timeFrom', inplace=True)
+        # if int(frequency[:-1]) >= 30:
+        #     ret_df = df.resample(frequency).apply(custom_fill)
+            
+        # else:
+        #     print("myr")
+        #     ret_df = df.resample(frequency).ffill()
+        # print(f'B4 ret df {ret_df}')
+        # ret_df.reset_index(inplace=True)
+        # ret_df['timeTo'] = ret_df['timeFrom'] + pd.Timedelta(minutes=int(frequency[:-1]))
+        # print(f'af ret df {ret_df}')
+        # return ret_df
+
+
+
+        # new_rows = []
+        # currentTimeFrom = start_date
+        # while currentTimeFrom < end_date:
+        #     timeEnd = min(currentTimeFrom + pd.Timedelta(minutes=target_frequency), pd.to_datetime(end_date))
+            
+        #     if target_frequency > 30:
+        #         relevant_rows = df[(df['timeFrom']>=currentTimeFrom) & (df['timeTo'] <= timeEnd)]
+        #         if not relevant_rows.empty:
+        #             new_row = relevant_rows.iloc[0].copy()
+        #             new_row["timeFrom"] = currentTimeFrom
+        #             new_row["timeTo"] = max(relevant_rows.iloc[-1]['timeTo'], timeEnd)
+        #             new_row["levelFrom"] = relevant_rows.iloc[0]["levelFrom"]
+        #             new_row["levelTo"] = relevant_rows.iloc[-1]["levelTo"]
+        #             new_rows.append(new_row)
+        #         currentTimeFrom = timeEnd
+            
+        #     else:
+        #         relevant_rows = df[((df["timeFrom"] <= currentTimeFrom) & (df["timeTo"] >= timeEnd))]
+        #         if not relevant_rows.empty:
+        #             new_row = relevant_rows.iloc[0].copy()
+        #             new_row["timeFrom"] = currentTimeFrom
+        #             new_row["timeTo"] = timeEnd
+        #             new_row["levelFrom"] = relevant_rows.iloc[0]["levelFrom"]
+        #             new_row["levelTo"] = relevant_rows.iloc[-1]["levelTo"]
+        #             new_rows.append(new_row)
+        #         else:
+        #             relevant_rows = df[((df["timeFrom"] <= currentTimeFrom) & (df["timeTo"] <= timeEnd))]
+        #             new_row = relevant_rows.iloc[-1].copy()
+        #             new_row["timeFrom"] = currentTimeFrom
+        #             new_row["timeTo"] = timeEnd
+        #             new_rows.append(new_row)
+        #         currentTimeFrom += pd.Timedelta(minutes=target_frequency)
+        
+        # ret_df = pd.DataFrame(new_rows)
+        # return ret_df
+        new_rows = []
+        currentTimeFrom = start_date
+        while currentTimeFrom < end_date:
+            timeEnd = min(currentTimeFrom + pd.Timedelta(minutes=target_frequency), end_date)
+            
+            # Select relevant rows within the current time window
+            relevant_rows = df[(df['timeFrom'] < timeEnd) & (df['timeTo'] >= currentTimeFrom)]
+            
+            if not relevant_rows.empty:
+                # Create a new row based on the first and last relevant rows
+                new_row = {
+                    "settlementDate": relevant_rows.iloc[0]["settlementDate"],
+                    "settlementPeriod": relevant_rows.iloc[0]["settlementPeriod"],
+                    "timeFrom": currentTimeFrom,
+                    "timeTo": timeEnd,
+                    "levelFrom": relevant_rows.iloc[0]["levelFrom"],
+                    "levelTo": relevant_rows.iloc[-1]["levelTo"]
+                }
+                new_rows.append(new_row)
+            
+            currentTimeFrom = timeEnd
+
+        ret_df = pd.DataFrame(new_rows)
+        return ret_df
+                    
+
+
 
     def invokeAPI(self, params):
         """
@@ -88,10 +176,22 @@ class BMRSAnalyzer(tk.Tk):
         if response.status_code == 200:
             data = response.json()["data"]
             df = pd.DataFrame(data)
-            print(f'The returned df has shape',df.shape)
-            df_str = tabulate(df, headers='keys', tablefmt='grid')
             if df.shape[0]==0:
                 df_str = "No records found...Try changing the parameters"
+            else:
+                print(f'ivde shape {df.shape}')
+                df['timeFrom'] = pd.to_datetime(df['timeFrom'])
+                df['timeTo'] = pd.to_datetime(df['timeTo'])
+                filtered_df = df[(df['timeFrom'] >= pd.to_datetime(params["from"])) & (df['timeTo'] <= pd.to_datetime(params["to"]))]
+
+                filtered_df = filtered_df.sort_values(by='timeFrom', ascending=True).reset_index(drop=True)
+                print("fdf:",filtered_df)
+                print(f'filtered df shape {filtered_df.shape}')
+                # self, df, frequency, start_date, end_date):
+                processed_df = self.DataResample(filtered_df, params["frequency"], pd.to_datetime(params["from"]), pd.to_datetime(params["to"]))
+                print(f'The returned df has shape',df.shape)
+                df_str = tabulate(processed_df, headers='keys', tablefmt='grid')
+            
         else:
             print(f"Failed to query physical data. Status code: {response.status_code}")
             response_json  = response.json()
@@ -111,7 +211,7 @@ class BMRSAnalyzer(tk.Tk):
         # Get input values
         start_date = self.start_date_entry.get()
         end_date = self.end_date_entry.get()
-        frequency = self.frequency_entry.get()
+        frequency = int(self.frequency_entry.get())
         bm_unit = self.bmunit_combo.get()
         
         params = {
@@ -119,7 +219,8 @@ class BMRSAnalyzer(tk.Tk):
             "from": start_date,
             "to": end_date,
             "dataset": "PN",
-            "APIKey": self.api_key
+            "APIKey": self.api_key,
+            "frequency":frequency
         }
         df_str = self.invokeAPI(params)
         
