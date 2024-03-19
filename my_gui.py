@@ -58,11 +58,16 @@ class BMRSAnalyzer(tk.Tk):
         # Create scrolled text area
         self.output_text = scrolledtext.ScrolledText(self, wrap='word')
         self.output_text.pack(fill=tk.BOTH, expand=True)
-        
+
+    #TODO: Change this to use some API instead of reading BM Units from a file    
     def getBmuValues(self):
+
+
         # Read only the "BM Unit ID" column from the CSV file and convert it to a list
         BMU_ids = pd.read_csv("./reg_bm_units.csv", usecols=["BM Unit ID"],skiprows=2).squeeze().tolist()
         return BMU_ids
+
+
     def invokeAPI(self, params):
         """
         Invoke the BMRS API and retrieve data.
@@ -126,6 +131,6 @@ class BMRSAnalyzer(tk.Tk):
 
 
 if __name__ == "__main__":
-    api_key = "l9jjurknxu8kkzv"
+    api_key = "l9jjurknxu8kkzv" #TODO This can be moved out by using env variables
     app = BMRSAnalyzer(api_key)
     app.mainloop()
