@@ -52,7 +52,7 @@ class BMRSAnalyzer(tk.Tk):
         self.end_date_label = tk.Label(self, text="End Date:")
         self.end_date_label.pack()
         self.end_date_entry = tk.Entry(self)
-        self.end_date_entry.insert(0, "2022-09-22T20:30Z")  #Placeholder value
+        self.end_date_entry.insert(0, "2022-09-22T22:00Z")  #Placeholder value
         self.end_date_entry.pack()
 
         # Frequency
@@ -71,7 +71,7 @@ class BMRSAnalyzer(tk.Tk):
         self.bmunit_combo.set("2__HFLEX001")
 
         #Analyse Button
-        self.analyse_button = tk.Button(self, text="Analyse", command=self.analyse)
+        self.analyse_button = tk.Button(self, text="Analyse", command=self.Analyse)
         self.analyse_button.pack()
 
         # Create scrolled text area
@@ -159,7 +159,7 @@ class BMRSAnalyzer(tk.Tk):
         
         return df_str
 
-    def analyse(self):
+    def Analyse(self):
         """Analyse the BMRS data based on user input.
 
         This method retrieves user input for start date, end date, frequency, and BM unit.
